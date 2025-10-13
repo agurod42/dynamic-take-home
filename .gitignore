@@ -1,0 +1,34 @@
+# Node dependencies
+node_modules/
+
+# Environment files
+.env
+.env.*
+!.env.template
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# OS / Editor junk
+.DS_Store
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Build outputs
+coverage/
+dist/
+build/
+
+# Data files (local state)
+data/db.json
+
+# Cache
+.cache/
+.next/
+.eslintcache

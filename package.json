@@ -1,0 +1,22 @@
+{
+  "name": "dynamic-take-home",
+  "version": "1.0.0",
+  "description": "VenCura custodial wallet take-home implementation",
+  "type": "module",
+  "main": "server/index.js",
+  "scripts": {
+    "dev": "node --watch server/index.js",
+    "start": "node server/index.js",
+    "test": "node --test"
+  },
+  "keywords": [
+    "wallet",
+    "vencura"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "ethers": "^6.15.0",
+    "dotenv": "^16.4.5"
+  }
+}

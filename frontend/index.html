@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VenCura</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>VenCura</h1>
+      <p class="tagline">Custodial wallet playground</p>
+    </header>
+    <main id="app" data-state="auth">
+      <section id="auth-panel">
+        <form id="register-form" autocomplete="on">
+          <h2>Register</h2>
+          <label>Email<input type="email" name="email" required /></label>
+          <label>Password<input type="password" name="password" minlength="8" required /></label>
+          <button type="submit">Create account</button>
+        </form>
+        <form id="login-form" autocomplete="on">
+          <h2>Login</h2>
+          <label>Email<input type="email" name="email" required /></label>
+          <label>Password<input type="password" name="password" minlength="8" required /></label>
+          <button type="submit">Sign in</button>
+        </form>
+      </section>
+      <section id="dashboard" hidden>
+        <div class="session-bar">
+          <div class="session-info">
+            <span id="session-email"></span>
+            <span id="session-chain" class="session-chain"></span>
+          </div>
+          <button id="logout-btn" type="button">Log out</button>
+        </div>
+        <section id="wallet-creation">
+          <h2>Create wallet</h2>
+          <form id="wallet-form">
+            <label>Name<input type="text" name="label" placeholder="Savings" /></label>
+            <button type="submit">Create wallet</button>
+          </form>
+        </section>
+        <section id="wallets-section">
+          <h2>Your wallets</h2>
+          <div id="wallet-list" class="card-grid"></div>
+        </section>
+        <section id="wallet-detail" hidden>
+          <h2 id="detail-title">Wallet</h2>
+          <div class="detail-body">
+            <p><strong>Address:</strong> <span id="detail-address"></span></p>
+            <p><strong>Network:</strong> <span id="detail-chain"></span></p>
+            <p><strong>Balance:</strong> <span id="detail-balance"></span></p>
+            <div class="actions">
+              <form id="sign-form">
+                <h3>Sign message</h3>
+                <input type="text" name="message" placeholder="Hello VenCura" required />
+                <button type="submit">Sign</button>
+                <pre id="sign-result" class="output"></pre>
+              </form>
+              <form id="send-form">
+                <h3>Send funds</h3>
+                <input type="text" name="to" placeholder="Recipient wallet ID or address" required />
+                <input type="number" step="0.0001" min="0" name="amount" placeholder="Amount" required />
+                <input type="text" name="memo" placeholder="Memo (optional)" />
+                <button type="submit">Send</button>
+                <pre id="send-result" class="output"></pre>
+              </form>
+              <form id="deposit-form">
+                <h3>Deposit test funds</h3>
+                <input type="number" step="0.01" min="1" name="amount" placeholder="Amount" required />
+                <button type="submit">Deposit</button>
+                <pre id="deposit-result" class="output"></pre>
+              </form>
+              <p id="deposit-disabled" class="hint" hidden>
+                Deposits are disabled in on-chain mode. Use a Sepolia faucet to fund this wallet.
+              </p>
+            </div>
+          </div>
+          <div>
+            <h3>Transactions</h3>
+            <ul id="transaction-list" class="transactions"></ul>
+          </div>
+        </section>
+      </section>
+    </main>
+    <footer>
+      <small>Built for Dynamic&apos;s take home. Data stored locally.</small>
+    </footer>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
