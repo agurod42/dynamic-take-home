@@ -82,3 +82,7 @@ Further hardening (out of scope for the take-home but recommended in production)
 - Transaction status polling and integration with on-chain explorers.
 - Notifications or messaging (e.g., XMTP) for signed events.
 - Replace the vanilla UI with a component library (React/Vue) once requirements grow.
+
+## License
+
+MIT © 2025 Agu Rodríguez. See `LICENSE` for details.
