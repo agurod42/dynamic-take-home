@@ -134,7 +134,7 @@ export async function getBalance(userId, walletId) {
   ensureOwnerRow(row, userId);
   if (isOnChainMode()) {
     const provider = getProvider();
-    const wei = await provider.getBalance(row.address);
+    const wei = await provider.getBalance(row.address, 'pending');
     return { walletId, balance: Number.parseFloat(formatEther(wei)) };
   }
   return { walletId, balance: Number(row.balance) };
@@ -207,7 +207,10 @@ export async function sendTransaction(userId, walletId, { to, amount, memo }) {
     });
     await sql`insert into transactions (id, hash, from_wallet_id, to_text, amount, memo, type, created_at)
               values (${randomUUID()}, ${tx.hash}, ${walletId}, ${destination}, ${numericAmount}, ${memo ? String(memo) : null}, ${targetWallet ? 'internal-onchain' : 'onchain'}, ${new Date().toISOString()})`;
-    return { transactionHash: tx.hash };
+    // Return pending balance so UI can update immediately
+    const pendingWei = await provider.getBalance(source.address, 'pending');
+    const pendingBalance = Number.parseFloat(formatEther(pendingWei));
+    return { transactionHash: tx.hash, source: { walletId, balance: pendingBalance } };
   }
 
   const txHash = createHash('sha256')
