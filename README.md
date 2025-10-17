@@ -1,6 +1,26 @@
-# VenCura – Custodial Wallet Playground
+<div align="center">
+  <p><h1 style="margin:0;">VenCura – Custodial Wallet Playground</h1></p>
 
-VenCura is a lightweight backend + UI that demonstrates how a custodial wallet platform could manage user accounts, generate wallets, and perform typical operations such as signing messages and sending transactions. The focus is on clear API design, basic security practices, and providing a realistic end-to-end flow that can be easily extended.
+  <p>
+    VenCura is a tiny, realistic backend + UI that demonstrates how a custodial wallet platform could manage user accounts, generate wallets, and perform typical operations such as signing messages and sending transactions. The focus is on clear API design, basic security practices, and providing a realistic end-to-end flow that can be easily extended.
+  </p>
+
+  <p>
+    <img src="./docs/demo.gif" alt="VenCura demo" style="border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,.12); max-width: 100%; height: auto;" />
+  </p>
+
+  <p>
+    <a href="https://nodejs.org/" target="_blank" rel="noreferrer noopener">
+      <img alt="Node 18+" src="https://img.shields.io/badge/node-%3E%3D18-0b7285" />
+    </a>
+    <a href="#license">
+      <img alt="License" src="https://img.shields.io/badge/license-MIT-0b7285" />
+    </a>
+    <img alt="Tech" src="https://img.shields.io/badge/ethers.js-v6-0b7285" />
+  </p>
+</div>
+
+---
 
 ## Tech stack
 
