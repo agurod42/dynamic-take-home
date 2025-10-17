@@ -11,8 +11,10 @@ import { badRequest, forbidden, notFound } from '../httpError.js';
 import { sql } from '../db.js';
 
 const INITIAL_BALANCE = 1000;
-let chainMode = (process.env.CHAIN_MODE || 'simulated').toLowerCase();
-const RPC_URL = process.env.SEPOLIA_RPC_URL;
+const CHAIN_MODE = (process.env.CHAIN_MODE || 'simulated').toLowerCase();
+const RPC_URL =
+  process.env.SEPOLIA_RPC_URL ||
+  'https://sepolia.infura.io/v3/<REDACTED>';
 function resolveKeyEncryptionSecret() {
   const raw = process.env.KEY_ENCRYPTION_SECRET;
   const secret = typeof raw === 'string' ? raw.trim() : '';

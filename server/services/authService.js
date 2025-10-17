@@ -1,18 +1,48 @@
-import { randomUUID, randomBytes, scryptSync, timingSafeEqual } from 'crypto';
+import { randomUUID, randomBytes, createHash, timingSafeEqual } from 'crypto';
+import { argon2id } from '@noble/hashes/argon2';
+import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
 import { badRequest, conflict, unauthorized } from '../httpError.js';
 import { sql } from '../db.js';
 
 const TOKEN_BYTES = 48;
 
-function hashPassword(password, salt = randomBytes(16).toString('hex')) {
-  const hash = scryptSync(password, salt, 64).toString('hex');
-  return { salt, hash };
+const PASSWORD_SALT_BYTES = 16;
+const ARGON2_MEMORY_KIB = 64 * 1024; // 64 MiB
+const ARGON2_ITERATIONS = 3;
+const ARGON2_PARALLELISM = 1;
+const ARGON2_HASH_LENGTH = 32;
+
+function derivePasswordHash(password, saltBuffer) {
+  return argon2id(password, saltBuffer, {
+    m: ARGON2_MEMORY_KIB,
+    t: ARGON2_ITERATIONS,
+    p: ARGON2_PARALLELISM,
+    dkLen: ARGON2_HASH_LENGTH,
+  });
 }
 
-function verifyPassword(password, salt, hash) {
-  const derived = scryptSync(password, salt, 64);
-  const expected = Buffer.from(hash, 'hex');
-  return timingSafeEqual(derived, expected);
+async function hashPassword(password) {
+  const saltBuffer = randomBytes(PASSWORD_SALT_BYTES);
+  const derived = derivePasswordHash(password, saltBuffer);
+  return { salt: bytesToHex(saltBuffer), hash: bytesToHex(derived) };
+}
+
+async function verifyPassword(password, saltHex, expectedHashHex) {
+  try {
+    const saltBuffer = Buffer.from(hexToBytes(saltHex));
+    const derived = Buffer.from(derivePasswordHash(password, saltBuffer));
+    const expected = Buffer.from(hexToBytes(expectedHashHex));
+    if (derived.length !== expected.length) {
+      return false;
+    }
+    return timingSafeEqual(derived, expected);
+  } catch {
+    return false;
+  }
+}
+
+function hashSessionToken(token) {
+  return createHash('sha256').update(token).digest('hex');
 }
 
 export async function registerUser({ email, password }) {
@@ -31,7 +61,7 @@ export async function registerUser({ email, password }) {
     throw conflict('User already exists');
   }
 
-  const { salt, hash } = hashPassword(trimmedPassword);
+  const { salt, hash } = await hashPassword(trimmedPassword);
   const id = randomUUID();
   const createdAt = new Date().toISOString();
   await sql`insert into users (id, email, password_salt, password_hash, created_at)
@@ -49,17 +79,18 @@ export async function loginUser({ email, password }) {
     throw unauthorized('Invalid credentials');
   }
   const user = result.rows[0];
-  const ok = verifyPassword(String(password), user.password_salt, user.password_hash);
+  const ok = await verifyPassword(String(password), user.password_salt, user.password_hash);
   if (!ok) {
     throw unauthorized('Invalid credentials');
   }
 
   const token = randomBytes(TOKEN_BYTES).toString('hex');
+  const tokenHash = hashSessionToken(token);
   const sessionId = randomUUID();
   const now = new Date().toISOString();
   await sql`delete from sessions where user_id = ${user.id}`;
   await sql`insert into sessions (id, user_id, token, created_at, last_seen_at)
-            values (${sessionId}, ${user.id}, ${token}, ${now}, ${now})`;
+            values (${sessionId}, ${user.id}, ${tokenHash}, ${now}, ${now})`;
 
   return { token, user: { id: user.id, email: user.email } };
 }
@@ -70,11 +101,12 @@ export async function requireAuth(req) {
     throw unauthorized();
   }
   const token = auth.slice('Bearer '.length).trim();
+  const tokenHash = hashSessionToken(token);
   const result = await sql`
     select u.id, u.email, s.id as session_id
     from sessions s
     join users u on u.id = s.user_id
-    where s.token = ${token}
+    where s.token = ${tokenHash}
     limit 1
   `;
   if (result.rowCount === 0) {
