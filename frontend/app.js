@@ -533,16 +533,52 @@ selectors.sendForm.addEventListener('submit', async (event) => {
   const to = formData.get('to');
   const amount = Number(formData.get('amount'));
   const memo = formData.get('memo') || undefined;
+  let previousBalance = null;
+  try {
+    const pre = await api(`/wallets/${state.selectedWallet.id}/balance`);
+    previousBalance = typeof pre?.balance === 'number' ? pre.balance : null;
+  } catch (_) {
+    // ignore pre-fetch errors
+  }
   try {
     const result = await api(`/wallets/${state.selectedWallet.id}/send`, {
       method: 'POST',
       body: { to, amount, memo }
     });
     selectors.sendResult.textContent = JSON.stringify(result, null, 2);
+    // Apply returned balances immediately when available (simulated mode)
+    if (result?.source && state.selectedWallet && result.source.walletId === state.selectedWallet.id) {
+      const wallet = state.wallets.find((w) => w.id === result.source.walletId);
+      if (wallet) wallet.balance = result.source.balance;
+      selectors.detailBalance.textContent = formatAmount(result.source.balance);
+    }
+    if (result?.destination) {
+      const dest = state.wallets.find((w) => w.id === result.destination.walletId);
+      if (dest && typeof result.destination.balance === 'number') {
+        dest.balance = result.destination.balance;
+      }
+    }
     selectors.sendForm.reset();
+    // Refresh UI; in on-chain mode this will fetch live balance, in simulated it re-renders
     await loadWallets();
     if (state.selectedWallet) {
       await refreshWalletDetail(state.selectedWallet.id);
+      // If on-chain, poll for balance change for a short period
+      if ((state.chainInfo?.mode || '').toLowerCase() === 'sepolia' && previousBalance !== null) {
+        const deadline = Date.now() + 45000; // up to 45s
+        while (Date.now() < deadline) {
+          try {
+            const latest = await api(`/wallets/${state.selectedWallet.id}/balance`);
+            if (typeof latest?.balance === 'number' && latest.balance !== previousBalance) {
+              selectors.detailBalance.textContent = formatAmount(latest.balance);
+              break;
+            }
+          } catch (_) {
+            // ignore polling errors and continue
+          }
+          await new Promise((r) => setTimeout(r, 3000));
+        }
+      }
     }
   } catch (error) {
     handleError(error);

@@ -227,7 +227,19 @@ export async function sendTransaction(userId, walletId, { to, amount, memo }) {
   await sql`insert into transactions (id, hash, from_wallet_id, to_text, amount, memo, type, created_at)
             values (${randomUUID()}, ${txHash}, ${walletId}, ${String(to)}, ${numericAmount}, ${memo ? String(memo) : null}, ${destinationType}, ${new Date().toISOString()})`;
 
-  return { transactionHash: txHash };
+  const updatedSource = await sql`select balance from wallets where id = ${walletId}`;
+  const sourceBalance = Number(updatedSource.rows[0].balance);
+  let destinationBalance = null;
+  if (targetWallet) {
+    const updatedDest = await sql`select balance from wallets where id = ${targetWallet.id}`;
+    destinationBalance = Number(updatedDest.rows[0].balance);
+  }
+
+  return {
+    transactionHash: txHash,
+    source: { walletId, balance: sourceBalance },
+    ...(targetWallet ? { destination: { walletId: targetWallet.id, balance: destinationBalance } } : {})
+  };
 }
 
 export async function listTransactions(userId, walletId) {
