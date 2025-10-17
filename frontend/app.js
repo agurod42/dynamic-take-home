@@ -180,10 +180,9 @@ function restoreSession() {
   if (token && email) {
     state.token = token;
     state.email = email;
-    updateView();
-    syncRouteWithHash();
-    loadWallets().catch(console.error);
+    return true;
   }
+  return false;
 }
 
 function updateView() {
@@ -581,8 +580,15 @@ window.addEventListener('hashchange', () => {
 
 async function initialize() {
   await loadConfig();
+  const restored = restoreSession();
   updateView();
-  restoreSession();
+  if (restored) {
+    try {
+      await loadWallets();
+    } catch (error) {
+      console.error(error);
+    }
+  }
 }
 
 initialize().catch((error) => {
