@@ -34,54 +34,136 @@
           </div>
           <button id="logout-btn" type="button">Log out</button>
         </div>
-        <section id="wallet-creation">
-          <h2>Create wallet</h2>
-          <form id="wallet-form">
-            <label>Name<input type="text" name="label" placeholder="Savings" /></label>
-            <button type="submit">Create wallet</button>
-          </form>
-        </section>
-        <section id="wallets-section">
-          <h2>Your wallets</h2>
-          <div id="wallet-list" class="card-grid"></div>
-        </section>
-        <section id="wallet-detail" hidden>
-          <h2 id="detail-title">Wallet</h2>
-          <div class="detail-body">
-            <p><strong>Address:</strong> <span id="detail-address"></span></p>
-            <p><strong>Network:</strong> <span id="detail-chain"></span></p>
-            <p><strong>Balance:</strong> <span id="detail-balance"></span></p>
-            <div class="actions">
-              <form id="sign-form">
-                <h3>Sign message</h3>
-                <input type="text" name="message" placeholder="Hello VenCura" required />
-                <button type="submit">Sign</button>
-                <pre id="sign-result" class="output"></pre>
-              </form>
-              <form id="send-form">
-                <h3>Send funds</h3>
-                <input type="text" name="to" placeholder="Recipient wallet ID or address" required />
-                <input type="number" step="0.0001" min="0" name="amount" placeholder="Amount" required />
-                <input type="text" name="memo" placeholder="Memo (optional)" />
-                <button type="submit">Send</button>
-                <pre id="send-result" class="output"></pre>
-              </form>
-              <form id="deposit-form">
-                <h3>Deposit test funds</h3>
-                <input type="number" step="0.01" min="1" name="amount" placeholder="Amount" required />
-                <button type="submit">Deposit</button>
-                <pre id="deposit-result" class="output"></pre>
-              </form>
-              <p id="deposit-disabled" class="hint" hidden>
-                Deposits are disabled in on-chain mode. Use a Sepolia faucet to fund this wallet.
-              </p>
+        <div class="dashboard-grid">
+          <aside class="sidebar" aria-label="Dashboard navigation">
+            <nav class="sidebar-nav">
+              <a href="#overview" class="sidebar-link" data-route-link="overview">
+                <span>Overview</span>
+              </a>
+              <a href="#wallets" class="sidebar-link" data-route-link="wallets">
+                <span>Wallets</span>
+              </a>
+              <a href="#settings" class="sidebar-link" data-route-link="settings">
+                <span>Settings</span>
+              </a>
+            </nav>
+            <div class="sidebar-footer">
+              <p class="hint">Select a section to get started.</p>
             </div>
+          </aside>
+          <div class="dashboard-content">
+            <section class="route-view" data-route="overview" hidden>
+              <header class="route-header">
+                <h2>Overview</h2>
+                <p class="hint">Quick glance at your VenCura session.</p>
+              </header>
+              <div class="overview-grid">
+                <article class="stat-card">
+                  <h3>Total wallets</h3>
+                  <p id="overview-wallet-count" class="stat-value">0</p>
+                </article>
+                <article class="stat-card">
+                  <h3>Active network</h3>
+                  <p id="overview-network" class="stat-value">Simulated Ledger</p>
+                </article>
+                <article class="stat-card">
+                  <h3>Last wallet created</h3>
+                  <p id="overview-last-wallet" class="stat-value">No wallets yet</p>
+                </article>
+              </div>
+              <section id="wallet-creation">
+                <h3>Create wallet</h3>
+                <form id="wallet-form">
+                  <label>Name<input type="text" name="label" placeholder="Savings" /></label>
+                  <button type="submit">Create wallet</button>
+                </form>
+              </section>
+            </section>
+            <section class="route-view" data-route="wallets" hidden>
+              <header class="route-header">
+                <h2>Your wallets</h2>
+                <p class="hint">Browse and manage your custodial wallets.</p>
+              </header>
+              <section id="wallets-section">
+                <div id="wallet-list" class="card-grid"></div>
+              </section>
+              <section id="wallet-detail" hidden>
+                <h3 id="detail-title">Wallet</h3>
+                <div class="detail-body">
+                  <p><strong>Address:</strong> <span id="detail-address"></span></p>
+                  <p><strong>Network:</strong> <span id="detail-chain"></span></p>
+                  <p><strong>Balance:</strong> <span id="detail-balance"></span></p>
+                  <div class="actions">
+                    <form id="sign-form">
+                      <h4>Sign message</h4>
+                      <input type="text" name="message" placeholder="Hello VenCura" required />
+                      <button type="submit">Sign</button>
+                      <pre id="sign-result" class="output"></pre>
+                    </form>
+                    <form id="send-form">
+                      <h4>Send funds</h4>
+                      <input type="text" name="to" placeholder="Recipient wallet ID or address" required />
+                      <input type="number" step="0.0001" min="0" name="amount" placeholder="Amount" required />
+                      <input type="text" name="memo" placeholder="Memo (optional)" />
+                      <button type="submit">Send</button>
+                      <pre id="send-result" class="output"></pre>
+                    </form>
+                    <form id="deposit-form">
+                      <h4>Deposit test funds</h4>
+                      <input type="number" step="0.01" min="1" name="amount" placeholder="Amount" required />
+                      <button type="submit">Deposit</button>
+                      <pre id="deposit-result" class="output"></pre>
+                    </form>
+                    <p id="deposit-disabled" class="hint" hidden>
+                      Deposits are disabled in on-chain mode. Use a Sepolia faucet to fund this wallet.
+                    </p>
+                  </div>
+                </div>
+                <div>
+                  <h4>Transactions</h4>
+                  <ul id="transaction-list" class="transactions"></ul>
+                </div>
+              </section>
+            </section>
+            <section class="route-view" data-route="settings" hidden>
+              <header class="route-header">
+                <h2>Settings</h2>
+                <p class="hint">Session details for troubleshooting and integrations.</p>
+              </header>
+              <section class="settings-panel">
+                <article class="settings-card">
+                  <h3>Account</h3>
+                  <dl>
+                    <div>
+                      <dt>Email</dt>
+                      <dd id="settings-email"></dd>
+                    </div>
+                    <div>
+                      <dt>Network</dt>
+                      <dd id="settings-network"></dd>
+                    </div>
+                    <div>
+                      <dt>Mode</dt>
+                      <dd id="settings-mode"></dd>
+                    </div>
+                    <div>
+                      <dt>RPC host</dt>
+                      <dd id="settings-rpc"></dd>
+                    </div>
+                  </dl>
+                </article>
+                <article class="settings-card">
+                  <h3>Helpful tips</h3>
+                  <ul class="settings-tips">
+                    <li>Use the Overview section to create new wallets.</li>
+                    <li>Switch to Wallets to send funds or review activity.</li>
+                    <li>Remember to log out on shared devices.</li>
+                  </ul>
+                </article>
+              </section>
+            </section>
           </div>
-          <div>
-            <h3>Transactions</h3>
-            <ul id="transaction-list" class="transactions"></ul>
-          </div>
-        </section>
+        </div>
       </section>
     </main>
     <footer>

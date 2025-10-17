@@ -34,8 +34,20 @@ const selectors = {
   signResult: document.getElementById('sign-result'),
   sendResult: document.getElementById('send-result'),
   depositResult: document.getElementById('deposit-result'),
-  depositDisabled: document.getElementById('deposit-disabled')
+  depositDisabled: document.getElementById('deposit-disabled'),
+  routeViews: document.querySelectorAll('[data-route]'),
+  routeLinks: document.querySelectorAll('[data-route-link]'),
+  overviewWalletCount: document.getElementById('overview-wallet-count'),
+  overviewNetwork: document.getElementById('overview-network'),
+  overviewLastWallet: document.getElementById('overview-last-wallet'),
+  settingsEmail: document.getElementById('settings-email'),
+  settingsNetwork: document.getElementById('settings-network'),
+  settingsMode: document.getElementById('settings-mode'),
+  settingsRpc: document.getElementById('settings-rpc')
 };
+
+const ROUTES = ['overview', 'wallets', 'settings'];
+const DEFAULT_ROUTE = 'overview';
 
 const CHAIN_LABELS = {
   simulated: 'Simulated Ledger',
@@ -64,15 +76,77 @@ function formatAmount(value) {
   return `${amount.toFixed(decimals)} ${unit}`;
 }
 
+function getRouteFromHash() {
+  return window.location.hash.replace(/^#/, '').trim() || null;
+}
+
+function resolveRoute(route) {
+  if (route && ROUTES.includes(route)) {
+    return route;
+  }
+  return DEFAULT_ROUTE;
+}
+
+function resetRoutes() {
+  Array.from(selectors.routeViews || []).forEach((view) => {
+    view.hidden = true;
+  });
+  Array.from(selectors.routeLinks || []).forEach((link) => {
+    link.removeAttribute('aria-current');
+    link.classList.remove('is-active');
+  });
+}
+
+function applyRoute(route) {
+  const target = resolveRoute(route);
+  Array.from(selectors.routeViews || []).forEach((view) => {
+    view.hidden = view.dataset.route !== target;
+  });
+  Array.from(selectors.routeLinks || []).forEach((link) => {
+    const linkRoute = link.dataset.routeLink;
+    const active = linkRoute === target;
+    if (active) {
+      link.setAttribute('aria-current', 'page');
+      link.classList.add('is-active');
+    } else {
+      link.removeAttribute('aria-current');
+      link.classList.remove('is-active');
+    }
+  });
+  if (target === 'overview') {
+    renderOverview();
+  } else if (target === 'settings') {
+    renderSettings();
+  }
+}
+
+function syncRouteWithHash() {
+  if (!state.token) {
+    resetRoutes();
+    return;
+  }
+  const requested = getRouteFromHash();
+  const target = resolveRoute(requested);
+  if (requested !== target) {
+    window.location.hash = `#${target}`;
+    return;
+  }
+  applyRoute(target);
+}
+
 function saveSession(token, email) {
   state.token = token;
   state.email = email;
   if (token) {
     localStorage.setItem('vencura_token', token);
     localStorage.setItem('vencura_email', email);
+    if (!ROUTES.includes(getRouteFromHash())) {
+      window.location.hash = `#${DEFAULT_ROUTE}`;
+    }
   } else {
     localStorage.removeItem('vencura_token');
     localStorage.removeItem('vencura_email');
+    window.location.hash = '#auth';
   }
   updateView();
 }
@@ -84,6 +158,7 @@ function restoreSession() {
     state.token = token;
     state.email = email;
     updateView();
+    syncRouteWithHash();
     loadWallets().catch(console.error);
   }
 }
@@ -95,12 +170,17 @@ function updateView() {
   if (authenticated) {
     selectors.sessionEmail.textContent = state.email;
     selectors.app.dataset.state = 'dashboard';
+    syncRouteWithHash();
+    renderSettings();
   } else {
     selectors.sessionEmail.textContent = '';
     selectors.app.dataset.state = 'auth';
     clearWalletDetail();
     state.wallets = [];
     renderWallets();
+    renderOverview();
+    renderSettings();
+    resetRoutes();
   }
   updateSessionBar();
   updateDepositState();
@@ -144,6 +224,7 @@ function updateSessionBar() {
   } else {
     selectors.sessionChain.textContent = '';
   }
+  renderSettings();
 }
 
 function updateDepositState() {
@@ -186,12 +267,45 @@ async function loadConfig() {
   }
   updateSessionBar();
   updateDepositState();
+  renderOverview();
+  renderSettings();
+}
+
+function renderOverview() {
+  if (!selectors.overviewWalletCount || !selectors.overviewNetwork || !selectors.overviewLastWallet) {
+    return;
+  }
+  const totalWallets = state.wallets.length;
+  selectors.overviewWalletCount.textContent = String(totalWallets);
+  selectors.overviewNetwork.textContent = currentChainLabel();
+  if (totalWallets) {
+    const latestWallet = [...state.wallets].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+    selectors.overviewLastWallet.textContent = new Date(latestWallet.createdAt).toLocaleString();
+  } else {
+    selectors.overviewLastWallet.textContent = 'No wallets yet';
+  }
+}
+
+function renderSettings() {
+  if (!selectors.settingsEmail || !selectors.settingsNetwork || !selectors.settingsMode || !selectors.settingsRpc) {
+    return;
+  }
+  selectors.settingsEmail.textContent = state.email || 'Not signed in';
+  if (state.token) {
+    selectors.settingsNetwork.textContent = currentChainLabel();
+    selectors.settingsMode.textContent = state.chainInfo?.mode || 'simulated';
+  } else {
+    selectors.settingsNetwork.textContent = '—';
+    selectors.settingsMode.textContent = '—';
+  }
+  selectors.settingsRpc.textContent = state.chainInfo?.rpcHost || 'Not configured';
 }
 
 function renderWallets() {
   selectors.walletList.innerHTML = '';
   if (!state.wallets.length) {
-    selectors.walletList.innerHTML = '<p>No wallets yet. Create one above.</p>';
+    selectors.walletList.innerHTML = '<p>No wallets yet. Visit the Overview section to create one.</p>';
+    renderOverview();
     return;
   }
   state.wallets.forEach((wallet) => {
@@ -212,6 +326,7 @@ function renderWallets() {
     card.appendChild(button);
     selectors.walletList.appendChild(card);
   });
+  renderOverview();
 }
 
 async function loadWallets() {
@@ -418,6 +533,10 @@ selectors.depositForm.addEventListener('submit', async (event) => {
   } catch (error) {
     handleError(error);
   }
+});
+
+window.addEventListener('hashchange', () => {
+  syncRouteWithHash();
 });
 
 async function initialize() {
