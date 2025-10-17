@@ -19,6 +19,31 @@ footer {
   padding: 1rem 2rem;
 }
 
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+header .brand {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+header .header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-left: auto;
+}
+
+header .header-logout {
+  margin-left: auto;
+}
+
 main {
   flex: 1;
   padding: 2rem;
@@ -35,9 +60,34 @@ h4 {
 }
 
 #auth-panel {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 2rem;
+  display: flex;
+  justify-content: center;
+  padding: 2rem 0;
+}
+
+.auth-view {
+  width: min(420px, 100%);
+  margin: 0 auto;
+}
+
+.auth-switch {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #1f2933;
+}
+
+.link-button {
+  border: none;
+  background: none;
+  color: #0b7285;
+  cursor: pointer;
+  font-weight: 600;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.link-button:hover {
+  color: #0c8599;
 }
 
 form {
@@ -208,8 +258,15 @@ button:hover {
 
 .session-chain {
   font-size: 0.9rem;
-  color: #0b7285;
   font-weight: 600;
+}
+
+header .session-info {
+  color: #ffffff;
+}
+
+header .session-chain {
+  color: #c3f9ff;
 }
 
 .card-grid {

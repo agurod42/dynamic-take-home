@@ -15,6 +15,7 @@ const selectors = {
   app: document.getElementById('app'),
   authPanel: document.getElementById('auth-panel'),
   dashboard: document.getElementById('dashboard'),
+  headerSession: document.getElementById('header-session'),
   registerForm: document.getElementById('register-form'),
   loginForm: document.getElementById('login-form'),
   walletForm: document.getElementById('wallet-form'),
@@ -35,6 +36,8 @@ const selectors = {
   sendResult: document.getElementById('send-result'),
   depositResult: document.getElementById('deposit-result'),
   depositDisabled: document.getElementById('deposit-disabled'),
+  authViews: document.querySelectorAll('[data-auth-route]'),
+  authLinks: document.querySelectorAll('[data-auth-link]'),
   routeViews: document.querySelectorAll('[data-route]'),
   routeLinks: document.querySelectorAll('[data-route-link]'),
   overviewWalletCount: document.getElementById('overview-wallet-count'),
@@ -46,8 +49,15 @@ const selectors = {
   settingsRpc: document.getElementById('settings-rpc')
 };
 
-const ROUTES = ['overview', 'wallets', 'settings'];
-const DEFAULT_ROUTE = 'overview';
+const ROUTE_GROUPS = {
+  auth: ['login', 'register'],
+  dashboard: ['overview', 'wallets', 'settings']
+};
+
+const DEFAULT_ROUTES = {
+  auth: 'login',
+  dashboard: 'overview'
+};
 
 const CHAIN_LABELS = {
   simulated: 'Simulated Ledger',
@@ -81,10 +91,19 @@ function getRouteFromHash() {
 }
 
 function resolveRoute(route) {
-  if (route && ROUTES.includes(route)) {
+  if (route === 'auth') {
+    return DEFAULT_ROUTES.auth;
+  }
+  if (state.token) {
+    if (ROUTE_GROUPS.dashboard.includes(route)) {
+      return route;
+    }
+    return DEFAULT_ROUTES.dashboard;
+  }
+  if (ROUTE_GROUPS.auth.includes(route)) {
     return route;
   }
-  return DEFAULT_ROUTE;
+  return DEFAULT_ROUTES.auth;
 }
 
 function resetRoutes() {
@@ -99,6 +118,13 @@ function resetRoutes() {
 
 function applyRoute(route) {
   const target = resolveRoute(route);
+  if (!state.token) {
+    Array.from(selectors.authViews || []).forEach((view) => {
+      view.hidden = view.dataset.authRoute !== target;
+    });
+    resetRoutes();
+    return;
+  }
   Array.from(selectors.routeViews || []).forEach((view) => {
     view.hidden = view.dataset.route !== target;
   });
@@ -121,10 +147,6 @@ function applyRoute(route) {
 }
 
 function syncRouteWithHash() {
-  if (!state.token) {
-    resetRoutes();
-    return;
-  }
   const requested = getRouteFromHash();
   const target = resolveRoute(requested);
   if (requested !== target) {
@@ -140,13 +162,14 @@ function saveSession(token, email) {
   if (token) {
     localStorage.setItem('vencura_token', token);
     localStorage.setItem('vencura_email', email);
-    if (!ROUTES.includes(getRouteFromHash())) {
-      window.location.hash = `#${DEFAULT_ROUTE}`;
+    const current = getRouteFromHash();
+    if (!ROUTE_GROUPS.dashboard.includes(current)) {
+      window.location.hash = `#${DEFAULT_ROUTES.dashboard}`;
     }
   } else {
     localStorage.removeItem('vencura_token');
     localStorage.removeItem('vencura_email');
-    window.location.hash = '#auth';
+    window.location.hash = `#${DEFAULT_ROUTES.auth}`;
   }
   updateView();
 }
@@ -167,10 +190,15 @@ function updateView() {
   const authenticated = Boolean(state.token);
   selectors.authPanel.hidden = authenticated;
   selectors.dashboard.hidden = !authenticated;
+  if (selectors.headerSession) {
+    selectors.headerSession.hidden = !authenticated;
+  }
+  if (selectors.logoutBtn) {
+    selectors.logoutBtn.hidden = !authenticated;
+  }
   if (authenticated) {
     selectors.sessionEmail.textContent = state.email;
     selectors.app.dataset.state = 'dashboard';
-    syncRouteWithHash();
     renderSettings();
   } else {
     selectors.sessionEmail.textContent = '';
@@ -184,6 +212,7 @@ function updateView() {
   }
   updateSessionBar();
   updateDepositState();
+  syncRouteWithHash();
 }
 
 async function api(path, options = {}) {
@@ -427,6 +456,7 @@ selectors.registerForm.addEventListener('submit', async (event) => {
     });
     window.alert('Account created! You can now sign in.');
     selectors.registerForm.reset();
+    window.location.hash = `#${DEFAULT_ROUTES.auth}`;
   } catch (error) {
     handleError(error);
   }
@@ -452,6 +482,16 @@ selectors.loginForm.addEventListener('submit', async (event) => {
 
 selectors.logoutBtn.addEventListener('click', () => {
   saveSession(null, null);
+});
+
+Array.from(selectors.authLinks || []).forEach((link) => {
+  link.addEventListener('click', (event) => {
+    event.preventDefault();
+    const route = link.dataset.authLink;
+    if (route) {
+      window.location.hash = `#${route}`;
+    }
+  });
 });
 
 selectors.walletForm.addEventListener('submit', async (event) => {

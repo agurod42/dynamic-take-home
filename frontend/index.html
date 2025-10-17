@@ -7,33 +7,53 @@
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <header>
-      <h1>VenCura</h1>
-      <p class="tagline">Custodial wallet playground</p>
+    <header class="site-header">
+      <div class="brand">
+        <h1>VenCura</h1>
+        <p class="tagline">Custodial wallet playground</p>
+      </div>
+      <div class="header-actions">
+        <div id="header-session" class="session-info" hidden>
+          <span id="session-email"></span>
+          <span id="session-chain" class="session-chain"></span>
+        </div>
+        <button id="logout-btn" type="button" class="header-logout" hidden>
+          Log out
+        </button>
+      </div>
     </header>
     <main id="app" data-state="auth">
       <section id="auth-panel">
-        <form id="register-form" autocomplete="on">
-          <h2>Register</h2>
-          <label>Email<input type="email" name="email" required /></label>
-          <label>Password<input type="password" name="password" minlength="8" required /></label>
-          <button type="submit">Create account</button>
-        </form>
-        <form id="login-form" autocomplete="on">
-          <h2>Login</h2>
-          <label>Email<input type="email" name="email" required /></label>
-          <label>Password<input type="password" name="password" minlength="8" required /></label>
-          <button type="submit">Sign in</button>
-        </form>
+        <section class="auth-view" data-auth-route="login">
+          <form id="login-form" autocomplete="on">
+            <h2>Login</h2>
+            <label>Email<input type="email" name="email" required /></label>
+            <label>Password<input type="password" name="password" minlength="8" required /></label>
+            <button type="submit">Sign in</button>
+            <p class="auth-switch">
+              Don't have an account?
+              <button type="button" class="link-button" data-auth-link="register">
+                Sign up
+              </button>
+            </p>
+          </form>
+        </section>
+        <section class="auth-view" data-auth-route="register" hidden>
+          <form id="register-form" autocomplete="on">
+            <h2>Register</h2>
+            <label>Email<input type="email" name="email" required /></label>
+            <label>Password<input type="password" name="password" minlength="8" required /></label>
+            <button type="submit">Create account</button>
+            <p class="auth-switch">
+              Already have an account?
+              <button type="button" class="link-button" data-auth-link="login">
+                Sign in
+              </button>
+            </p>
+          </form>
+        </section>
       </section>
       <section id="dashboard" hidden>
-        <div class="session-bar">
-          <div class="session-info">
-            <span id="session-email"></span>
-            <span id="session-chain" class="session-chain"></span>
-          </div>
-          <button id="logout-btn" type="button">Log out</button>
-        </div>
         <div class="dashboard-grid">
           <aside class="sidebar" aria-label="Dashboard navigation">
             <nav class="sidebar-nav">
