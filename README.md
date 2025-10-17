@@ -7,6 +7,7 @@ VenCura is a lightweight backend + UI that demonstrates how a custodial wallet p
 - **Ethers.js v6** for key management, message signing, and on-chain transactions.
 - **Node.js (ES modules)** for the API server.
 
+## Getting started
 
 ```bash
 # Install Node.js 18+ (v20 tested) and install dependencies
@@ -65,7 +66,7 @@ While the project is intentionally lightweight, the implementation keeps securit
 - Two modes: `simulated` (local ledger) and `sepolia` (on-chain). Deposits are disabled in on-chain mode to avoid inconsistent balances.
 - The JSON-RPC provider is only constructed and used in on-chain mode.
 
-Further hardening (out of scope for the take-home but recommended in production):
+### Further hardening (out of scope for the take-home but recommended in production):
 
 - Move encrypted keys into an HSM or dedicated key-management service.
 - Replace the simple session model with signed JWTs or opaque tokens backed by a secure, expiring session store; add rotation/revocation.
