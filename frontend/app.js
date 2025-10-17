@@ -414,11 +414,15 @@ function renderTransactions(transactions) {
     .forEach((tx) => {
       const item = document.createElement('li');
       item.className = 'transaction';
+      const isOnChain = (state.chainInfo?.mode || '').toLowerCase() === 'sepolia' && String(tx.type || '').includes('onchain') && /^0x[a-fA-F0-9]{64}$/.test(String(tx.hash || ''));
+      const hashHtml = isOnChain
+        ? `<a href="https://sepolia.etherscan.io/tx/${tx.hash}" target="_blank" rel="noopener noreferrer">${tx.hash}</a>`
+        : String(tx.hash || '');
       item.innerHTML = `
         <div><strong>${tx.type ?? 'tx'}</strong> &middot; ${new Date(tx.createdAt).toLocaleString()}</div>
         <div><strong>Amount:</strong> ${formatAmount(tx.amount)}</div>
         <div><strong>To:</strong> ${tx.to}</div>
-        <div><strong>Hash:</strong> ${tx.hash}</div>
+        <div><strong>Hash:</strong> ${hashHtml}</div>
         ${tx.memo ? `<div><strong>Memo:</strong> ${tx.memo}</div>` : ''}
       `;
       selectors.transactionList.appendChild(item);
