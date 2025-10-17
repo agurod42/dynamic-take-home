@@ -65,6 +65,11 @@ h4 {
   padding: 2rem 0;
 }
 
+/* Ensure login/auth widget stays hidden when viewing the dashboard (e.g., Overview) */
+main[data-state='dashboard'] #auth-panel {
+  display: none !important;
+}
+
 .auth-view {
   width: min(420px, 100%);
   margin: 0 auto;
