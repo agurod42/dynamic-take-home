@@ -280,6 +280,11 @@ header .session-chain {
   gap: 1rem;
 }
 
+/* Add vertical space between the wallets grid and the details panel */
+#wallets-section {
+  margin-bottom: 1.5rem;
+}
+
 .wallet-card {
   background: #ffffff;
   padding: 1rem;
@@ -315,6 +320,32 @@ header .session-chain {
   border-radius: 8px;
   padding: 1rem;
   box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+}
+
+.faucet-hint {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.faucet-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.6rem 1.2rem; /* match button */
+  border-radius: 4px; /* match button */
+  background: #0b7285;
+  color: #ffffff;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.2s ease;
+}
+
+.faucet-button:hover,
+.faucet-button:focus {
+  background: #0c8599;
 }
 
 .output {

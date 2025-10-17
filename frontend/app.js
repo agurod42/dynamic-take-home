@@ -267,9 +267,17 @@ function updateDepositState() {
     return;
   }
   const depositAllowed = state.chainInfo?.depositEnabled ?? true;
-  selectors.depositForm.hidden = !depositAllowed;
+  selectors.depositForm.hidden = false;
   selectors.depositResult.hidden = !depositAllowed;
   selectors.depositDisabled.hidden = depositAllowed;
+  // Hide inputs and button in on-chain mode
+  const inputEl = selectors.depositForm.querySelector('input[name="amount"]');
+  const buttonEl = selectors.depositForm.querySelector('button[type="submit"]');
+  if (inputEl && buttonEl) {
+    const hide = !depositAllowed;
+    inputEl.style.display = hide ? 'none' : '';
+    buttonEl.style.display = hide ? 'none' : '';
+  }
   if (!depositAllowed) {
     selectors.depositResult.textContent = '';
   }
@@ -593,7 +601,7 @@ selectors.depositForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   if (!state.selectedWallet) return;
   if (state.chainInfo?.depositEnabled === false) {
-    window.alert('Deposits are disabled in on-chain mode. Please use a faucet to fund your wallet.');
+    window.alert('Deposits are disabled in on-chain mode. Use the Sepolia faucet to fund your wallet.');
     return;
   }
   const formData = new FormData(selectors.depositForm);
