@@ -16,8 +16,8 @@
     <a href="#license">
       <img alt="License" src="https://img.shields.io/badge/license-MIT-0b7285" />
     </a>
-    <a href="https://github.com/dynamic-labs/dynamic-take-home/actions/workflows/backend-tests.yml">
-      <img alt="Backend tests" src="https://github.com/dynamic-labs/dynamic-take-home/actions/workflows/backend-tests.yml/badge.svg" />
+    <a href="https://github.com/agurod42/dynamic-take-home/actions/workflows/tests.yml">
+      <img alt="Backend tests" src="https://github.com/agurod42/dynamic-take-home/actions/workflows/tests.yml/badge.svg" />
     </a>
     <img alt="Tech" src="https://img.shields.io/badge/ethers.js-v6-0b7285" />
   </p>
@@ -25,10 +25,29 @@
 
 ---
 
-## Tech stack
+## Design decisions
 
-- **Ethers.js v6** for key management, message signing, and on-chain transactions.
-- **Node.js (ES modules)** for the API server.
+### Technical pillars
+
+- Favor simplicity and clarity over breadth: small, focused modules in `server/services/*`, a thin `routes.js`, and a lightweight UI.
+- Data model choices: single active session per user to simplify revocation and tracking.
+- Cryptography decisions: Argon2id for password hashing; AES-256-GCM for key-at-rest encryption with a key derived via `scrypt`; private keys never leave the backend. Note: Initially, I used Node’s crypto.scryptSync for simplicity, but later decided to make the backend more realistic by introducing Argon2id, which follows the current OWASP recommendation.
+- Auth transport: bearer tokens are pragmatic for a demo; JWTs or an expiring session store are called out as future hardening.
+
+### Prioritization
+
+1. Establish the core user journeys first: registration/login, wallet creation, balance display, message signing, and transfers.
+2. Build a secure foundation up front: password hashing, session model, encrypted key storage, and a minimal but robust database schema with constraints.
+3. Optimize for local developer experience: default to a simulated chain for fast iterations; keep on-chain mode opt-in via `CHAIN_MODE`.
+4. Add production guardrails: env validation, per-request authorization, and mode-specific feature flags (e.g., disabling deposits on-chain).
+
+### Future enhancements
+
+- Multi-account support per user with configurable account types.
+- Shared wallets with invite flows.
+- Transaction status polling and integration with on-chain explorers.
+- Notifications or messaging (e.g., XMTP) for signed events.
+- Replace the vanilla UI with a component library (React/Vue) once requirements grow.
 
 ## Getting started
 
@@ -97,15 +116,6 @@ While the project is intentionally lightweight, the implementation keeps securit
 - Restrict CORS to trusted origins; if switching to cookies, use HttpOnly + SameSite and add CSRF protections.
 - Rotate RPC credentials securely and add transaction status tracking.
 - Introduce role-based access control (RBAC) for shared wallets and multi-user scenarios.
-
-
-## Future enhancements
-
-- Multi-account support per user with configurable account types.
-- Shared wallets with invite flows.
-- Transaction status polling and integration with on-chain explorers.
-- Notifications or messaging (e.g., XMTP) for signed events.
-- Replace the vanilla UI with a component library (React/Vue) once requirements grow.
 
 ## License
 
