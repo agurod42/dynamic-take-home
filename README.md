@@ -5,7 +5,7 @@ VenCura is a lightweight backend + UI that demonstrates how a custodial wallet p
 ## Tech stack
 
 - **Node.js (ES modules)** for the API server.
-- **File-backed storage** (`data/db.json`) to keep the project self-contained.
+- **Vercel Postgres** for persistent storage.
 - **Ethers.js v6** for key management, message signing, and on-chain transactions.
 
 
@@ -28,13 +28,12 @@ Environment variables:
 
 - `PORT` – overrides the listening port (default `3000`).
 - `HOST` – bind host (defaults to `127.0.0.1` inside this project).
-- `DATABASE_FILE` – relative or absolute path to the JSON database (useful for testing).
 - `CHAIN_MODE` – `simulated` (default) keeps everything local; `sepolia` enables live on-chain flow.
 - `SEPOLIA_RPC_URL` – HTTPS RPC endpoint to use when `CHAIN_MODE=sepolia` (defaults to the provided Infura URL).
 - `KEY_ENCRYPTION_SECRET` – passphrase used to encrypt wallet private keys at rest (change this in any real deployment).
-- `SUPPRESS_LOGS` – set to suppress startup logs (used in tests).
+- `SUPPRESS_LOGS` – set to suppress startup logs.
 
-The server stores all data in `data/db.json`. Deleting that file resets the state.
+The server stores all data in Postgres.
 
 ## API overview
 
@@ -59,7 +58,7 @@ Authentication uses a bearer token returned from `POST /auth/login`.
 ### Wallet behaviour
 
 - Wallets are generated with Ethers (`secp256k1` keys) and private keys are encrypted at rest with AES-256-GCM.
-- In simulated mode balances live in the JSON store; in Sepolia mode balances are fetched from the RPC provider.
+- In simulated mode balances live in Postgres; in Sepolia mode balances are fetched from the RPC provider.
 - Balances update with each transaction; internal transfers credit the recipient wallet automatically.
 - A transaction history is recorded locally for auditability (on-chain transactions include their hash).
 
@@ -88,13 +87,7 @@ Set `CHAIN_MODE=sepolia`, point `SEPOLIA_RPC_URL` to your RPC provider (Infura/A
 
 ## Testing
 
-The `tests/api.test.js` suite exercises the domain services:
-
-- Validates registration constraints.
-- Verifies login flow and session issuance.
-- Ensures wallet creation, signing, internal transfers, and transaction history function correctly.
-
-Tests run with Node’s built-in runner: `npm test` (or `node --test`).
+Coming soon: SQL-backed tests using the same Postgres instance.
 
 ## Security considerations
 
@@ -117,7 +110,7 @@ Further hardening (out of scope for the take-home but recommended in a productio
 
 ## Deployment notes
 
-Because the stack has no external dependencies, deployment can happen on any provider that supports Node.js (Heroku, Render, Fly.io, etc.). Set `HOST=0.0.0.0` in those environments so the server binds to all interfaces. Persisting the JSON database is enough for demo purposes, but production should use a real database or managed storage bucket. In Sepolia mode remember to supply `CHAIN_MODE=sepolia`, `SEPOLIA_RPC_URL`, and a strong `KEY_ENCRYPTION_SECRET` via your platform’s secrets manager.
+Deployment can happen on any provider that supports Node.js. Set `HOST=0.0.0.0` in those environments so the server binds to all interfaces. For Sepolia mode remember to supply `CHAIN_MODE=sepolia`, `SEPOLIA_RPC_URL`, and a strong `KEY_ENCRYPTION_SECRET` via your platform’s secrets manager.
 
 ## Future enhancements
 
@@ -126,3 +119,61 @@ Because the stack has no external dependencies, deployment can happen on any pro
 - Transaction status polling and integration with on-chain explorers.
 - Notifications or messaging (e.g., XMTP) for signed events.
 - Replace the vanilla UI with a component library (React/Vue) once requirements grow.
+
+## Deploying to Vercel
+
+This repo includes a `vercel.json` and a serverless function under `api/index.js` so it can be deployed to Vercel with no code changes. The function reuses the existing `App` from `server/app.js`, and the static UI is served via rewrites to files in `frontend/`.
+
+Steps:
+
+1. Install the Vercel CLI and log in:
+
+   ```bash
+   npm i -g vercel
+   vercel login
+   ```
+
+2. Set required environment variables (recommended at project level in the Vercel dashboard or via CLI):
+
+   - `KEY_ENCRYPTION_SECRET` – strong secret for AES-256-GCM at-rest key encryption.
+   - Optional chain settings:
+     - `CHAIN_MODE` – `simulated` (default) or `sepolia`.
+     - `SEPOLIA_RPC_URL` – HTTPS RPC endpoint when using `sepolia`.
+
+3. Deploy:
+
+   ```bash
+   vercel        # preview
+   vercel --prod # production
+   ```
+
+4. Local test with Vercel runtime (optional):
+
+   ```bash
+   vercel dev
+   ```
+
+Notes:
+
+- The UI is static and references `/app.js` and `/styles.css`; `vercel.json` rewrites map these to files in `frontend/`.
+
+### Using Vercel Postgres
+
+The app can run fully on Vercel Postgres using `@vercel/postgres`. The schema is auto-initialized on boot.
+
+Environment variables:
+
+- `POSTGRES_URL` – full connection string (provided by Vercel Postgres integration). Alternatively, set `POSTGRES_HOST`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DATABASE` (supported by `@vercel/postgres`).
+- `KEY_ENCRYPTION_SECRET` – required. Used to encrypt wallet private keys at rest.
+- Optional:
+  - `CHAIN_MODE` – `simulated` (default) or `sepolia`.
+  - `SEPOLIA_RPC_URL` – HTTPS RPC endpoint for Sepolia.
+
+Local dev will use the same Postgres URL you configure (intentionally mirroring prod). To run locally:
+
+```bash
+export POSTGRES_URL="..."      # from Vercel Postgres
+export KEY_ENCRYPTION_SECRET="a-strong-secret"
+npm run dev
+# open http://127.0.0.1:3000
+```

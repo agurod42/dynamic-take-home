@@ -5,6 +5,7 @@ import { dirname, extname, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { App } from './app.js';
 import { configureRoutes } from './routes.js';
+import { initSchemaIfNeeded } from './db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -69,6 +70,8 @@ async function serveStatic(req, res) {
     }
   }
 }
+
+await initSchemaIfNeeded();
 
 const server = createServer((req, res) => {
   if (req.url.startsWith('/api')) {

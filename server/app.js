@@ -84,7 +84,7 @@ export class App {
       const context = { req, res, params, query, user: null };
 
       if (route.auth) {
-        context.user = requireAuth(req);
+        context.user = await requireAuth(req);
       }
 
       if (req.method !== 'GET' && req.method !== 'DELETE') {

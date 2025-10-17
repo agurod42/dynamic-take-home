@@ -1,6 +1,6 @@
 import { randomUUID, randomBytes, scryptSync, timingSafeEqual } from 'crypto';
-import { db } from '../database.js';
 import { badRequest, conflict, unauthorized } from '../httpError.js';
+import { sql } from '../db.js';
 
 const TOKEN_BYTES = 48;
 
@@ -15,7 +15,7 @@ function verifyPassword(password, salt, hash) {
   return timingSafeEqual(derived, expected);
 }
 
-export function registerUser({ email, password }) {
+export async function registerUser({ email, password }) {
   if (!email || !password) {
     throw badRequest('Email and password are required');
   }
@@ -26,77 +26,61 @@ export function registerUser({ email, password }) {
     throw badRequest('Password must be at least 8 characters long');
   }
 
-  const existing = db.getState().users.find((u) => u.email === normalizedEmail);
-  if (existing) {
+  const existing = await sql`select 1 from users where email = ${normalizedEmail} limit 1`;
+  if (existing.rowCount > 0) {
     throw conflict('User already exists');
   }
 
-  const user = db.update((state) => {
-    const { salt, hash } = hashPassword(trimmedPassword);
-    const newUser = {
-      id: randomUUID(),
-      email: normalizedEmail,
-      passwordSalt: salt,
-      passwordHash: hash,
-      createdAt: new Date().toISOString()
-    };
-    state.users.push(newUser);
-    return newUser;
-  });
-
-  return { id: user.id, email: user.email };
+  const { salt, hash } = hashPassword(trimmedPassword);
+  const id = randomUUID();
+  const createdAt = new Date().toISOString();
+  await sql`insert into users (id, email, password_salt, password_hash, created_at)
+            values (${id}, ${normalizedEmail}, ${salt}, ${hash}, ${createdAt})`;
+  return { id, email: normalizedEmail };
 }
 
-export function loginUser({ email, password }) {
+export async function loginUser({ email, password }) {
   if (!email || !password) {
     throw badRequest('Email and password are required');
   }
   const normalizedEmail = String(email).trim().toLowerCase();
-  const user = db.getState().users.find((u) => u.email === normalizedEmail);
-  if (!user) {
+  const result = await sql`select id, email, password_salt, password_hash from users where email = ${normalizedEmail} limit 1`;
+  if (result.rowCount === 0) {
     throw unauthorized('Invalid credentials');
   }
-  const ok = verifyPassword(String(password), user.passwordSalt, user.passwordHash);
+  const user = result.rows[0];
+  const ok = verifyPassword(String(password), user.password_salt, user.password_hash);
   if (!ok) {
     throw unauthorized('Invalid credentials');
   }
 
   const token = randomBytes(TOKEN_BYTES).toString('hex');
-  const session = db.update((state) => {
-    const newSession = {
-      id: randomUUID(),
-      userId: user.id,
-      token,
-      createdAt: new Date().toISOString(),
-      lastSeenAt: new Date().toISOString()
-    };
-    state.sessions = state.sessions.filter((s) => s.userId !== user.id);
-    state.sessions.push(newSession);
-    return newSession;
-  });
+  const sessionId = randomUUID();
+  const now = new Date().toISOString();
+  await sql`delete from sessions where user_id = ${user.id}`;
+  await sql`insert into sessions (id, user_id, token, created_at, last_seen_at)
+            values (${sessionId}, ${user.id}, ${token}, ${now}, ${now})`;
 
-  return { token: session.token, user: { id: user.id, email: user.email } };
+  return { token, user: { id: user.id, email: user.email } };
 }
 
-export function requireAuth(req) {
+export async function requireAuth(req) {
   const auth = req.headers['authorization'];
   if (!auth || !auth.startsWith('Bearer ')) {
     throw unauthorized();
   }
   const token = auth.slice('Bearer '.length).trim();
-  const session = db.getState().sessions.find((s) => s.token === token);
-  if (!session) {
+  const result = await sql`
+    select u.id, u.email, s.id as session_id
+    from sessions s
+    join users u on u.id = s.user_id
+    where s.token = ${token}
+    limit 1
+  `;
+  if (result.rowCount === 0) {
     throw unauthorized();
   }
-  const user = db.getState().users.find((u) => u.id === session.userId);
-  if (!user) {
-    throw unauthorized();
-  }
-  db.update((state) => {
-    const target = state.sessions.find((s) => s.id === session.id);
-    if (target) {
-      target.lastSeenAt = new Date().toISOString();
-    }
-  });
-  return user;
+  const row = result.rows[0];
+  await sql`update sessions set last_seen_at = ${new Date().toISOString()} where id = ${row.session_id}`;
+  return { id: row.id, email: row.email };
 }

@@ -7,8 +7,8 @@ import {
   scryptSync
 } from 'crypto';
 import { JsonRpcProvider, Wallet, formatEther, parseEther } from 'ethers';
-import { db } from '../database.js';
 import { badRequest, forbidden, notFound } from '../httpError.js';
+import { sql } from '../db.js';
 
 const INITIAL_BALANCE = 1000;
 let chainMode = (process.env.CHAIN_MODE || 'simulated').toLowerCase();
@@ -71,78 +71,84 @@ function getProvider() {
   return providerCache;
 }
 
-function serializeWallet(wallet) {
-  const { privateKeyEncrypted, userId, ...rest } = wallet;
-  return rest;
+function mapWalletRow(row) {
+  return {
+    id: row.id,
+    label: row.label,
+    address: row.address,
+    publicKey: row.public_key,
+    createdAt: row.created_at,
+    chain: row.chain || undefined,
+    // balance is omitted in on-chain mode
+    ...(row.balance !== null && row.balance !== undefined ? { balance: Number(row.balance) } : {})
+  };
 }
 
-function ensureOwner(wallet, userId) {
-  if (wallet.userId !== userId) {
+function ensureOwnerRow(row, userId) {
+  if (row.user_id !== userId) {
     throw forbidden('You do not have access to this wallet');
   }
 }
 
-export function createWallet(userId, { label }) {
+export async function createWallet(userId, { label }) {
   const trimmedLabel = label ? String(label).trim() : undefined;
   const generatedWallet = Wallet.createRandom();
-  const storedWallet = db.update((state) => {
-    const newWallet = {
-      id: randomUUID(),
-      userId,
-      label: trimmedLabel || `Wallet ${state.wallets.length + 1}`,
-      address: generatedWallet.address,
-      publicKey: generatedWallet.publicKey,
-      privateKeyEncrypted: encryptPrivateKey(generatedWallet.privateKey),
-      balance: isOnChainMode() ? undefined : INITIAL_BALANCE,
-      createdAt: new Date().toISOString()
-    };
-    if (isOnChainMode()) {
-      newWallet.chain = 'sepolia';
-    }
-    state.wallets.push(newWallet);
-    return newWallet;
-  });
-  return serializeWallet(storedWallet);
+  const id = randomUUID();
+  const createdAt = new Date().toISOString();
+  const chain = isOnChainMode() ? 'sepolia' : null;
+  const balance = isOnChainMode() ? null : INITIAL_BALANCE;
+  const privateKeyEncrypted = encryptPrivateKey(generatedWallet.privateKey);
+  const finalLabel = trimmedLabel || `Wallet ${id.slice(0, 8)}`;
+
+  await sql`
+    insert into wallets (id, user_id, label, address, public_key, private_key_encrypted, balance, chain, created_at)
+    values (${id}, ${userId}, ${finalLabel}, ${generatedWallet.address}, ${generatedWallet.publicKey}, ${privateKeyEncrypted}, ${balance}, ${chain}, ${createdAt})
+  `;
+  const row = (await sql`select * from wallets where id = ${id} limit 1`).rows[0];
+  return mapWalletRow(row);
 }
 
-export function listWallets(userId) {
-  const wallets = db.getState().wallets.filter((w) => w.userId === userId);
-  return wallets.map(serializeWallet);
+export async function listWallets(userId) {
+  const result = await sql`select * from wallets where user_id = ${userId} order by created_at asc`;
+  return result.rows.map(mapWalletRow);
 }
 
-export function getWallet(userId, walletId) {
-  const wallet = db.getState().wallets.find((w) => w.id === walletId);
-  if (!wallet) {
+export async function getWallet(userId, walletId) {
+  const result = await sql`select * from wallets where id = ${walletId} limit 1`;
+  if (result.rowCount === 0) {
     throw notFound('Wallet not found');
   }
-  ensureOwner(wallet, userId);
-  return serializeWallet(wallet);
+  const row = result.rows[0];
+  ensureOwnerRow(row, userId);
+  return mapWalletRow(row);
 }
 
 export async function getBalance(userId, walletId) {
-  const wallet = db.getState().wallets.find((w) => w.id === walletId);
-  if (!wallet) {
+  const result = await sql`select * from wallets where id = ${walletId} limit 1`;
+  if (result.rowCount === 0) {
     throw notFound('Wallet not found');
   }
-  ensureOwner(wallet, userId);
+  const row = result.rows[0];
+  ensureOwnerRow(row, userId);
   if (isOnChainMode()) {
     const provider = getProvider();
-    const wei = await provider.getBalance(wallet.address);
+    const wei = await provider.getBalance(row.address);
     return { walletId, balance: Number.parseFloat(formatEther(wei)) };
   }
-  return { walletId, balance: wallet.balance };
+  return { walletId, balance: Number(row.balance) };
 }
 
 export async function signMessage(userId, walletId, message) {
   if (!message) {
     throw badRequest('Message is required');
   }
-  const wallet = db.getState().wallets.find((w) => w.id === walletId);
-  if (!wallet) {
+  const result = await sql`select * from wallets where id = ${walletId} limit 1`;
+  if (result.rowCount === 0) {
     throw notFound('Wallet not found');
   }
-  ensureOwner(wallet, userId);
-  const signer = new Wallet(decryptPrivateKey(wallet.privateKeyEncrypted));
+  const row = result.rows[0];
+  ensureOwnerRow(row, userId);
+  const signer = new Wallet(decryptPrivateKey(row.private_key_encrypted));
   const signature = await signer.signMessage(String(message));
   return {
     walletId,
@@ -161,19 +167,18 @@ export async function sendTransaction(userId, walletId, { to, amount, memo }) {
     throw badRequest('Amount must be a positive number');
   }
 
-  const state = db.getState();
-  const wallet = state.wallets.find((w) => w.id === walletId);
-  if (!wallet) {
+  const rowResult = await sql`select * from wallets where id = ${walletId} limit 1`;
+  if (rowResult.rowCount === 0) {
     throw notFound('Wallet not found');
   }
-  ensureOwner(wallet, userId);
-  if (!isOnChainMode() && wallet.balance < numericAmount) {
+  const source = rowResult.rows[0];
+  ensureOwnerRow(source, userId);
+  if (!isOnChainMode() && Number(source.balance) < numericAmount) {
     throw badRequest('Insufficient balance');
   }
 
-  const targetWallet =
-    state.wallets.find((w) => w.id === to) ||
-    state.wallets.find((w) => w.address.toLowerCase() === String(to).toLowerCase());
+  const targetResult = await sql`select * from wallets where id = ${to} or lower(address) = lower(${String(to)}) limit 1`;
+  const targetWallet = targetResult.rowCount ? targetResult.rows[0] : null;
 
   if (isOnChainMode()) {
     const provider = getProvider();
@@ -181,7 +186,7 @@ export async function sendTransaction(userId, walletId, { to, amount, memo }) {
     if (!destination.startsWith('0x')) {
       throw badRequest('Destination must be a valid wallet ID or address');
     }
-    const privateKey = decryptPrivateKey(wallet.privateKeyEncrypted);
+    const privateKey = decryptPrivateKey(source.private_key_encrypted);
     const signer = new Wallet(privateKey, provider);
     let weiValue;
     try {
@@ -189,7 +194,7 @@ export async function sendTransaction(userId, walletId, { to, amount, memo }) {
     } catch (error) {
       throw badRequest('Amount must be a valid decimal value');
     }
-    const currentBalance = await provider.getBalance(wallet.address);
+    const currentBalance = await provider.getBalance(source.address);
     if (currentBalance < weiValue) {
       throw badRequest('Insufficient on-chain balance');
     }
@@ -197,18 +202,8 @@ export async function sendTransaction(userId, walletId, { to, amount, memo }) {
       to: destination,
       value: weiValue
     });
-    db.update((draft) => {
-      draft.transactions.push({
-        id: randomUUID(),
-        hash: tx.hash,
-        fromWalletId: walletId,
-        to: destination,
-        amount: numericAmount,
-        memo: memo ? String(memo) : undefined,
-        type: targetWallet ? 'internal-onchain' : 'onchain',
-        createdAt: new Date().toISOString()
-      });
-    });
+    await sql`insert into transactions (id, hash, from_wallet_id, to_text, amount, memo, type, created_at)
+              values (${randomUUID()}, ${tx.hash}, ${walletId}, ${destination}, ${numericAmount}, ${memo ? String(memo) : null}, ${targetWallet ? 'internal-onchain' : 'onchain'}, ${new Date().toISOString()})`;
     return { transactionHash: tx.hash };
   }
 
@@ -216,53 +211,48 @@ export async function sendTransaction(userId, walletId, { to, amount, memo }) {
     .update([walletId, to, numericAmount, Date.now()].join(':'))
     .digest('hex');
 
-  db.update((draft) => {
-    const source = draft.wallets.find((w) => w.id === walletId);
-    if (!source) {
-      throw notFound('Wallet not found');
-    }
-    if (source.balance < numericAmount) {
-      throw badRequest('Insufficient balance');
-    }
-    source.balance -= numericAmount;
+  // Deduct from source
+  await sql`update wallets set balance = balance - ${numericAmount} where id = ${walletId}`;
 
-    let destinationType = 'external';
-    if (targetWallet) {
-      const destination = draft.wallets.find((w) => w.id === targetWallet.id);
-      if (destination) {
-        destination.balance += numericAmount;
-        destinationType = 'internal';
-      }
-    }
+  // Credit destination if internal
+  let destinationType = 'external';
+  if (targetWallet) {
+    await sql`update wallets set balance = balance + ${numericAmount} where id = ${targetWallet.id}`;
+    destinationType = 'internal';
+  }
 
-    draft.transactions.push({
-      id: randomUUID(),
-      hash: txHash,
-      fromWalletId: walletId,
-      to,
-      amount: numericAmount,
-      memo: memo ? String(memo) : undefined,
-      type: destinationType,
-      createdAt: new Date().toISOString()
-    });
-  });
+  await sql`insert into transactions (id, hash, from_wallet_id, to_text, amount, memo, type, created_at)
+            values (${randomUUID()}, ${txHash}, ${walletId}, ${String(to)}, ${numericAmount}, ${memo ? String(memo) : null}, ${destinationType}, ${new Date().toISOString()})`;
 
   return { transactionHash: txHash };
 }
 
-export function listTransactions(userId, walletId) {
-  const wallet = db.getState().wallets.find((w) => w.id === walletId);
-  if (!wallet) {
+export async function listTransactions(userId, walletId) {
+  const walletResult = await sql`select * from wallets where id = ${walletId} limit 1`;
+  if (walletResult.rowCount === 0) {
     throw notFound('Wallet not found');
   }
-  ensureOwner(wallet, userId);
-  const transactions = db
-    .getState()
-    .transactions.filter((tx) => tx.fromWalletId === walletId || tx.to === walletId || tx.to === wallet.address);
-  return transactions.map((tx) => ({ ...tx }));
+  const walletRow = walletResult.rows[0];
+  ensureOwnerRow(walletRow, userId);
+  const txs = await sql`
+    select * from transactions
+    where from_wallet_id = ${walletId}
+       or to_text = ${walletId}
+       or to_text = ${walletRow.address}
+  `;
+  return txs.rows.map((r) => ({
+    id: r.id,
+    hash: r.hash,
+    fromWalletId: r.from_wallet_id,
+    to: r.to_text,
+    amount: Number(r.amount),
+    memo: r.memo || undefined,
+    type: r.type,
+    createdAt: r.created_at
+  }));
 }
 
-export function deposit(userId, walletId, amount) {
+export async function deposit(userId, walletId, amount) {
   if (isOnChainMode()) {
     throw badRequest('Deposits are not available in on-chain mode. Please fund the wallet directly.');
   }
@@ -270,30 +260,18 @@ export function deposit(userId, walletId, amount) {
   if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
     throw badRequest('Amount must be positive');
   }
-  const wallet = db.getState().wallets.find((w) => w.id === walletId);
-  if (!wallet) {
+  const walletResult = await sql`select * from wallets where id = ${walletId} limit 1`;
+  if (walletResult.rowCount === 0) {
     throw notFound('Wallet not found');
   }
-  ensureOwner(wallet, userId);
-  const updated = db.update((draft) => {
-    const target = draft.wallets.find((w) => w.id === walletId);
-    if (!target) {
-      throw notFound('Wallet not found');
-    }
-    target.balance += numericAmount;
-    draft.transactions.push({
-      id: randomUUID(),
-      hash: createHash('sha256').update([walletId, 'deposit', Date.now()].join(':')).digest('hex'),
-      fromWalletId: null,
-      to: walletId,
-      amount: numericAmount,
-      memo: 'Deposit',
-      type: 'deposit',
-      createdAt: new Date().toISOString()
-    });
-    return { walletId: target.id, balance: target.balance };
-  });
-  return updated;
+  const walletRow = walletResult.rows[0];
+  ensureOwnerRow(walletRow, userId);
+  await sql`update wallets set balance = balance + ${numericAmount} where id = ${walletId}`;
+  const txHash = createHash('sha256').update([walletId, 'deposit', Date.now()].join(':')).digest('hex');
+  await sql`insert into transactions (id, hash, from_wallet_id, to_text, amount, memo, type, created_at)
+            values (${randomUUID()}, ${txHash}, ${null}, ${walletId}, ${numericAmount}, ${'Deposit'}, ${'deposit'}, ${new Date().toISOString()})`;
+  const updated = await sql`select balance from wallets where id = ${walletId}`;
+  return { walletId, balance: Number(updated.rows[0].balance) };
 }
 
 function detectRpcHost() {
