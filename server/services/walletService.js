@@ -2,16 +2,78 @@ import {
   createCipheriv,
   createDecipheriv,
   createHash,
+  createHmac,
   randomBytes,
   randomUUID,
   scryptSync
 } from 'crypto';
-import { JsonRpcProvider, Wallet, formatEther, parseEther } from 'ethers';
 import { badRequest, forbidden, notFound } from '../httpError.js';
 import { sql } from '../db.js';
 
+let Wallet;
+let JsonRpcProvider;
+let formatEther;
+let parseEther;
+
+if (process.env.MOCK_ETHERS === '1') {
+  class StubWallet {
+    constructor(privateKey, provider = null) {
+      const asString = typeof privateKey === 'string' ? privateKey : Buffer.from(privateKey).toString('hex');
+      this.privateKey = asString.startsWith('0x') ? asString : `0x${asString}`;
+      this.provider = provider;
+      this.publicKey = `0x${createHash('sha256').update(this.privateKey).digest('hex')}`;
+      this.address = `0x${createHash('ripemd160').update(this.publicKey).digest('hex').padStart(40, '0').slice(0, 40)}`;
+    }
+
+    static createRandom() {
+      const privateKey = `0x${randomBytes(32).toString('hex')}`;
+      return new StubWallet(privateKey);
+    }
+
+    async signMessage(message) {
+      const hmac = createHmac('sha256', Buffer.from(this.privateKey.slice(2), 'hex'));
+      hmac.update(String(message));
+      return `0x${hmac.digest('hex')}`;
+    }
+
+    async sendTransaction({ to, value }) {
+      return {
+        hash: `0x${createHash('sha256')
+          .update([this.privateKey, to ?? '', value ? value.toString() : ''].join(':'))
+          .digest('hex')}`,
+      };
+    }
+  }
+
+  class StubProvider {
+    constructor(url) {
+      this.url = url;
+    }
+
+    async getBalance() {
+      return 0n;
+    }
+  }
+
+  Wallet = StubWallet;
+  JsonRpcProvider = StubProvider;
+  formatEther = (wei) => {
+    const numeric = typeof wei === 'bigint' ? Number(wei) / 1e18 : Number(wei);
+    return Number.isFinite(numeric) ? numeric.toString() : '0';
+  };
+  parseEther = (value) => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      throw new Error('invalid value');
+    }
+    return BigInt(Math.round(numeric * 1e18));
+  };
+} else {
+  ({ JsonRpcProvider, Wallet, formatEther, parseEther } = await import('ethers'));
+}
+
 const INITIAL_BALANCE = 1000;
-const CHAIN_MODE = (process.env.CHAIN_MODE || 'simulated').toLowerCase();
+let chainMode = (process.env.CHAIN_MODE || 'simulated').toLowerCase();
 const RPC_URL =
   process.env.SEPOLIA_RPC_URL ||
   'https://sepolia.infura.io/v3/<REDACTED>';
@@ -35,7 +97,7 @@ const ALGORITHM = 'aes-256-gcm';
 let providerCache = null;
 
 function isOnChainMode() {
-  return CHAIN_MODE === 'sepolia';
+  return chainMode === 'sepolia';
 }
 
 function deriveEncryptionKey() {
@@ -311,11 +373,16 @@ function getLabel(mode) {
 }
 
 export function getChainInfo() {
-  const mode = isOnChainMode() ? 'sepolia' : CHAIN_MODE;
+  const mode = isOnChainMode() ? 'sepolia' : chainMode;
   return {
     mode,
     label: getLabel(mode),
     depositEnabled: !isOnChainMode(),
     rpcHost: isOnChainMode() ? detectRpcHost() : null
   };
+}
+
+export function __setChainModeForTesting(mode) {
+  chainMode = mode;
+  providerCache = null;
 }

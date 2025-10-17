@@ -16,6 +16,9 @@
     <a href="#license">
       <img alt="License" src="https://img.shields.io/badge/license-MIT-0b7285" />
     </a>
+    <a href="https://github.com/dynamic-labs/dynamic-take-home/actions/workflows/backend-tests.yml">
+      <img alt="Backend tests" src="https://github.com/dynamic-labs/dynamic-take-home/actions/workflows/backend-tests.yml/badge.svg" />
+    </a>
     <img alt="Tech" src="https://img.shields.io/badge/ethers.js-v6-0b7285" />
   </p>
 </div>

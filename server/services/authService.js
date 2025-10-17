@@ -1,8 +1,26 @@
 import { randomUUID, randomBytes, createHash, timingSafeEqual } from 'crypto';
-import { argon2id } from '@noble/hashes/argon2';
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
 import { badRequest, conflict, unauthorized } from '../httpError.js';
 import { sql } from '../db.js';
+
+let argon2idImpl;
+let bytesToHexImpl;
+let hexToBytesImpl;
+
+if (process.env.MOCK_CRYPTO === '1') {
+  argon2idImpl = (password, salt) => {
+    const hash = createHash('sha256');
+    hash.update(typeof password === 'string' ? password : Buffer.from(password));
+    hash.update(Buffer.from(salt));
+    return Uint8Array.from(hash.digest());
+  };
+  bytesToHexImpl = (bytes) => Buffer.from(bytes).toString('hex');
+  hexToBytesImpl = (hex) => Uint8Array.from(Buffer.from(hex, 'hex'));
+} else {
+  ({ argon2id: argon2idImpl } = await import('@noble/hashes/argon2'));
+  const utils = await import('@noble/hashes/utils');
+  bytesToHexImpl = utils.bytesToHex;
+  hexToBytesImpl = utils.hexToBytes;
+}
 
 const TOKEN_BYTES = 48;
 
@@ -12,8 +30,16 @@ const ARGON2_ITERATIONS = 3;
 const ARGON2_PARALLELISM = 1;
 const ARGON2_HASH_LENGTH = 32;
 
+let lastTimestampMs = 0;
+function nowIso() {
+  const current = Date.now();
+  const ensured = Math.max(current, lastTimestampMs + 1);
+  lastTimestampMs = ensured;
+  return new Date(ensured).toISOString();
+}
+
 function derivePasswordHash(password, saltBuffer) {
-  return argon2id(password, saltBuffer, {
+  return argon2idImpl(password, saltBuffer, {
     m: ARGON2_MEMORY_KIB,
     t: ARGON2_ITERATIONS,
     p: ARGON2_PARALLELISM,
@@ -24,14 +50,14 @@ function derivePasswordHash(password, saltBuffer) {
 async function hashPassword(password) {
   const saltBuffer = randomBytes(PASSWORD_SALT_BYTES);
   const derived = derivePasswordHash(password, saltBuffer);
-  return { salt: bytesToHex(saltBuffer), hash: bytesToHex(derived) };
+  return { salt: bytesToHexImpl(saltBuffer), hash: bytesToHexImpl(derived) };
 }
 
 async function verifyPassword(password, saltHex, expectedHashHex) {
   try {
-    const saltBuffer = Buffer.from(hexToBytes(saltHex));
+    const saltBuffer = Buffer.from(hexToBytesImpl(saltHex));
     const derived = Buffer.from(derivePasswordHash(password, saltBuffer));
-    const expected = Buffer.from(hexToBytes(expectedHashHex));
+    const expected = Buffer.from(hexToBytesImpl(expectedHashHex));
     if (derived.length !== expected.length) {
       return false;
     }
@@ -63,7 +89,7 @@ export async function registerUser({ email, password }) {
 
   const { salt, hash } = await hashPassword(trimmedPassword);
   const id = randomUUID();
-  const createdAt = new Date().toISOString();
+  const createdAt = nowIso();
   await sql`insert into users (id, email, password_salt, password_hash, created_at)
             values (${id}, ${normalizedEmail}, ${salt}, ${hash}, ${createdAt})`;
   return { id, email: normalizedEmail };
@@ -87,7 +113,7 @@ export async function loginUser({ email, password }) {
   const token = randomBytes(TOKEN_BYTES).toString('hex');
   const tokenHash = hashSessionToken(token);
   const sessionId = randomUUID();
-  const now = new Date().toISOString();
+  const now = nowIso();
   await sql`delete from sessions where user_id = ${user.id}`;
   await sql`insert into sessions (id, user_id, token, created_at, last_seen_at)
             values (${sessionId}, ${user.id}, ${tokenHash}, ${now}, ${now})`;
@@ -113,6 +139,6 @@ export async function requireAuth(req) {
     throw unauthorized();
   }
   const row = result.rows[0];
-  await sql`update sessions set last_seen_at = ${new Date().toISOString()} where id = ${row.session_id}`;
+  await sql`update sessions set last_seen_at = ${nowIso()} where id = ${row.session_id}`;
   return { id: row.id, email: row.email };
 }

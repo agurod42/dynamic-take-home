@@ -1,6 +1,27 @@
-import { sql } from '@vercel/postgres';
+let vercelSql;
+
+if (process.env.MOCK_SQL === '1') {
+  vercelSql = async () => {
+    throw new Error('SQL client not configured');
+  };
+} else {
+  ({ sql: vercelSql } = await import('@vercel/postgres'));
+}
 
 let initialized = false;
+let sqlClient = vercelSql;
+
+export function setSqlClient(client) {
+  sqlClient = client;
+}
+
+export function __resetSqlClientForTesting() {
+  sqlClient = vercelSql;
+}
+
+export function __resetInitForTesting() {
+  initialized = false;
+}
 
 export async function initSchemaIfNeeded() {
   if (initialized) return;
@@ -47,6 +68,8 @@ export async function initSchemaIfNeeded() {
   initialized = true;
 }
 
-export { sql };
+export function sql(strings, ...values) {
+  return sqlClient(strings, ...values);
+}
 
 

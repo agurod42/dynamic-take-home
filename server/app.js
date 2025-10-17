@@ -45,9 +45,10 @@ async function readBody(req) {
 }
 
 export class App {
-  constructor({ basePath = '/api' } = {}) {
+  constructor({ basePath = '/api', authResolver = requireAuth } = {}) {
     this.basePath = basePath;
     this.routes = [];
+    this.authResolver = authResolver;
   }
 
   register(method, path, handler, { auth = false } = {}) {
@@ -84,7 +85,7 @@ export class App {
       const context = { req, res, params, query, user: null };
 
       if (route.auth) {
-        context.user = await requireAuth(req);
+        context.user = await this.authResolver(req);
       }
 
       if (req.method !== 'GET' && req.method !== 'DELETE') {

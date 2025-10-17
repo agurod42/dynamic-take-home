@@ -1,0 +1,23 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: Run backend test suite
+        run: npm test
+        env:
+          KEY_ENCRYPTION_SECRET: local-testing-secret-value-12345678901234567890
+          NODE_ENV: test
+          SUPPRESS_LOGS: '1'
+          CHAIN_MODE: simulated
