@@ -2,23 +2,23 @@
   "name": "dynamic-take-home",
   "version": "1.0.0",
   "description": "VenCura custodial wallet take-home implementation",
+  "author": "Agu Rodríguez",
+  "license": "MIT",
   "type": "module",
   "main": "server/index.js",
-  "scripts": {
-    "dev": "node --watch server/index.js",
-    "start": "node server/index.js",
-    "test": "node --test"
+  "dependencies": {
+    "@noble/hashes": "^1.5.0",
+    "@vercel/postgres": "^0.8.0",
+    "dotenv": "^16.4.5",
+    "ethers": "^6.15.0"
   },
   "keywords": [
     "wallet",
     "vencura"
   ],
-  "author": "",
-  "license": "MIT",
-  "dependencies": {
-    "@vercel/postgres": "^0.8.0",
-    "ethers": "^6.15.0",
-    "dotenv": "^16.4.5",
-    "@noble/hashes": "^1.5.0"
+  "scripts": {
+    "dev": "node --watch server/index.js",
+    "start": "node server/index.js",
+    "test": "node --test"
   }
 }
