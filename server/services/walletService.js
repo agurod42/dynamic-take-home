@@ -179,7 +179,8 @@ export async function sendTransaction(userId, walletId, { to, amount, memo }) {
     throw badRequest('Insufficient balance');
   }
 
-  const targetResult = await sql`select * from wallets where id = ${to} or lower(address) = lower(${String(to)}) limit 1`;
+  const toText = String(to).trim();
+  const targetResult = await sql`select * from wallets where id::text = ${toText} or lower(address) = lower(${toText}) limit 1`;
   const targetWallet = targetResult.rowCount ? targetResult.rows[0] : null;
 
   if (isOnChainMode()) {
